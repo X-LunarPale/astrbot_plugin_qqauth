@@ -14,6 +14,8 @@ This plugin connects QQ Official group messages in AstrBot to the QQAuth module 
 
 Only QQ Official group events (including the Webhook adapter) are supported. QQ Official `group_openid` and sender IDs are not ordinary QQ numbers. Both sides must use the same group ID. QQAuth's OneBot mode is a separate transport; it does not use this plugin.
 
+The Minecraft server can use the official module [QQAuth Support](https://github.com/X-LunarPale/LunarCore-LC/blob/main/module-market/README.md) of [LunarCore](https://github.com/X-LunarPale/LunarCore-LC).
+
 ## Settings
 
 | Setting | Meaning |
