@@ -11,6 +11,7 @@
 5. 在指定群里发送 `/验证 000000`，应收到“验证码无效”之类的回复。然后用玩家进服时获取的真实验证码测试。其他群的消息不会转发。
 
 这个插件仅处理 QQ 官方群（含 QQ 官方 Webhook）；普通 QQ 号与官方机器人的 `group_openid` 不是一回事。游戏服的 OneBot 模式不需要这个插件。
+Minecraft服务端可使用[LunarCore琉月核心](https://github.com/X-LunarPale/LunarCore-LC)的官方模块[QQAuth支持](https://github.com/X-LunarPale/LunarCore-LC/blob/main/module-market/README.md)
 
 ## 配置项
 
