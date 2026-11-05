@@ -3,10 +3,11 @@ SPDX-License-Identifier: MIT. See LICENSE.
 """
 import asyncio
 import json
+import socket
 import ssl
 import urllib.error
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -17,6 +18,15 @@ COMMANDS = (("bind_prefix", "验证"), ("unbind_prefix", "解绑"),
             ("password_reset_prefix", "改密"))
 DEFAULT_URL = "http://127.0.0.1:12312/qqauth/group"
 DEFAULT_ERROR_REPLY = "QQ 验证服务暂不可用，请稍后重试。"
+
+
+def bridge_url(value):
+    """Accept a server base address as well as the full bridge endpoint."""
+    parsed = urlsplit(str(value).strip())
+    if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("Invalid bridge URL")
+    path = parsed.path.rstrip("/")
+    return urlunsplit(parsed._replace(path=path or "/qqauth/group"))
 
 
 def normalize_command(message, prefixes):
@@ -35,6 +45,7 @@ def failure_reason(error):
         return {
             400: "HTTP 400：请求格式不匹配，请核对 QQAuth 模块版本",
             401: "HTTP 401：桥接密钥不一致",
+            403: "HTTP 403：接口访问被拒绝，请检查反向代理配置",
             404: "HTTP 404：接口地址应以 /qqauth/group 结尾",
             413: "HTTP 413：消息过长",
         }.get(error.code, f"HTTP {error.code}：QQAuth 服务返回错误")
@@ -46,8 +57,12 @@ def failure_reason(error):
         if isinstance(error.reason, ssl.SSLError):
             return "HTTPS 证书校验失败，请检查证书或 tls_ca_file"
         if isinstance(error.reason, TimeoutError):
-            return "请求超时，请检查 QQAuth 服务是否运行"
-        return "无法连接 QQAuth，请检查地址、端口和网络"
+            return "请求超时，请检查 QQAuth 监听地址、端口映射和防火墙"
+        if isinstance(error.reason, ConnectionRefusedError):
+            return "连接被拒绝：请检查 QQAuth 是否启用及桥接端口；Docker/异机不能使用 127.0.0.1"
+        if isinstance(error.reason, socket.gaierror):
+            return "域名解析失败，请检查 QQAuth 地址"
+        return "无法连接 QQAuth，请检查桥接地址和端口；该接口不使用 Web 或 RCON 端口"
     if isinstance(error, ValueError):
         return "桥接配置或服务响应无效，请检查 QQAuth 地址、密钥和日志"
     return "请求失败，请检查 QQAuth 服务日志"
@@ -60,7 +75,9 @@ class QQAuthBridge(Star):
         self._slots = asyncio.Semaphore(4)
         self._closed = False
 
-    @filter.platform_adapter_type(filter.PlatformAdapterType.QQOFFICIAL | filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP |
+                                  filter.PlatformAdapterType.QQOFFICIAL |
+                                  filter.PlatformAdapterType.QQOFFICIAL_WEBHOOK)
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
         if self._closed:
@@ -96,12 +113,10 @@ class QQAuthBridge(Star):
                 yield event.plain_result(reply)
 
     def _post_json(self, payload):
-        url = str(self.config.get("qqauth_url", DEFAULT_URL)).strip()
+        url = bridge_url(self.config.get("qqauth_url", DEFAULT_URL))
         parsed_url = urlsplit(url)
         token = str(self.config.get("qqauth_token", "")).strip()
         timeout = float(self.config.get("timeout_seconds", 5))
-        if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname or parsed_url.username or parsed_url.password:
-            raise ValueError("Invalid bridge URL")
         if not token or not 0 < timeout <= 60:
             raise ValueError("Invalid bridge settings")
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")

@@ -1,7 +1,7 @@
 {
-  "qqauth_url": {"description":"QQAuth 模块接口地址", "type":"string", "default":"http://127.0.0.1:12312/qqauth/group", "hint":"与游戏服同机可用默认地址；跨机器填写可访问的完整地址，以 /qqauth/group 结尾"},
+  "qqauth_url": {"description":"QQAuth 桥接地址", "type":"string", "default":"http://127.0.0.1:12312/qqauth/group", "hint":"填写游戏服的 QQAuth HTTP 地址，非 Web/RCON 端口；省略路径时自动补齐 /qqauth/group。Docker/异机不能照用 127.0.0.1"},
   "qqauth_token": {"description":"QQAuth 桥接密钥", "type":"string", "secret":true, "hint":"与 QQAuth 模块配置中的 integration.astrbot.token 一致，不要发到群里"},
-  "group_id": {"description":"验证群 ID（QQ 官方 group_openid）", "type":"string", "hint":"须与 QQAuth 模块中的 integration.group-id 一致；空值或 * 不处理消息"},
+  "group_id": {"description":"验证群 ID（群号或 group_openid）", "type":"string", "hint":"OneBot/NapCat 填群号，QQ 官方机器人填 group_openid；须与 QQAuth 模块中的 integration.group-id 一致，空值或 * 不处理消息"},
   "bind_prefix": {"description":"群内绑定命令", "type":"string", "default":"/验证", "hint":"可改为别名；插件会转换为服务端识别的 /验证"},
   "unbind_prefix": {"description":"群内解绑命令", "type":"string", "default":"/解绑", "hint":"可改为别名；插件会转换为服务端识别的 /解绑"},
   "password_reset_prefix": {"description":"群内改密命令", "type":"string", "default":"/改密", "hint":"可改为别名；插件会转换为服务端识别的 /改密"},

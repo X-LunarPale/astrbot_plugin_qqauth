@@ -1,9 +1,10 @@
 name: astrbot_plugin_qqauth
 display_name: QQAuth 群验证桥接
-desc: 在 AstrBot 的 QQ 官方群中验证、解绑或恢复游戏账号。
-version: 2.1.0
+desc: 通过 QQ 官方或 OneBot/NapCat 群消息验证、解绑或恢复游戏账号。
+version: 2.1.1
 author: QQAuth contributors / LunarBoreal
 repo: https://github.com/X-LunarPale/astrbot_plugin_qqauth
 support_platforms:
+  - aiocqhttp
   - qq_official
   - qq_official_webhook
