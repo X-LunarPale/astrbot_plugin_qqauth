@@ -3,6 +3,7 @@ import asyncio
 import importlib.util
 import json
 import pathlib
+import socket
 import ssl
 import sys
 import threading
@@ -18,10 +19,14 @@ api.logger = types.SimpleNamespace(warning=warnings.append)
 events = types.ModuleType("astrbot.api.event")
 events.AstrMessageEvent = object
 class Filters:
-    PlatformAdapterType = types.SimpleNamespace(QQOFFICIAL=1, QQOFFICIAL_WEBHOOK=2)
+    PlatformAdapterType = types.SimpleNamespace(QQOFFICIAL=1, QQOFFICIAL_WEBHOOK=2, AIOCQHTTP=4)
     EventMessageType = types.SimpleNamespace(GROUP_MESSAGE=1)
     @staticmethod
-    def platform_adapter_type(*args): return lambda fn: fn
+    def platform_adapter_type(value):
+        def decorate(fn):
+            fn.adapter_types = value
+            return fn
+        return decorate
     @staticmethod
     def event_message_type(*args): return lambda fn: fn
 events.filter = Filters
@@ -60,6 +65,17 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bridge.DEFAULT_URL, schema["qqauth_url"]["default"])
         self.assertIs(schema["qqauth_token"]["secret"], True)
         self.assertEqual(bridge.DEFAULT_ERROR_REPLY, schema["error_reply"]["default"])
+        self.assertEqual(7, bridge.QQAuthBridge.on_group_message.adapter_types)
+
+    def test_base_address_and_trailing_slash(self):
+        for address in ["http://127.0.0.1:12312", "http://127.0.0.1:12312/",
+                        "http://127.0.0.1:12312/qqauth/group/"]:
+            self.assertEqual(bridge.DEFAULT_URL, bridge.bridge_url(address))
+        self.assertEqual("https://bridge.example/proxy/qqauth/group",
+                         bridge.bridge_url("https://bridge.example/proxy/qqauth/group"))
+        for address in ["localhost:12312", "ws://localhost:12312", "http://user:password@localhost"]:
+            with self.assertRaises(ValueError):
+                bridge.bridge_url(address)
     async def test_identity_and_reset_reply(self):
         plugin = bridge.QQAuthBridge(None, {"group_id": "g"})
         payloads = []
@@ -117,6 +133,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("超时", bridge.failure_reason(TimeoutError("secret")))
         self.assertIn("端口", bridge.failure_reason(urllib.error.URLError("secret")))
         self.assertNotIn("secret", bridge.failure_reason(ValueError("secret")))
+        self.assertIn("连接被拒绝", bridge.failure_reason(urllib.error.URLError(ConnectionRefusedError())))
+        self.assertIn("域名解析失败", bridge.failure_reason(urllib.error.URLError(socket.gaierror())))
 
     def test_http_request_and_response(self):
         received = []
@@ -130,7 +148,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
             handler.end_headers()
             handler.wfile.write(data)
         url = self.server(respond)
-        plugin = bridge.QQAuthBridge(None, {"qqauth_url": url, "qqauth_token": "test-token"})
+        plugin = bridge.QQAuthBridge(None, {"qqauth_url": url.removesuffix("/qqauth/group"), "qqauth_token": "test-token"})
         payload = {"group_id": "g", "sender_id": "real", "message": "/验证 123456"}
         self.assertEqual("验证成功", plugin._post_json(payload)["reply"])
         self.assertEqual(("/qqauth/group", "test-token", payload), received[0])
